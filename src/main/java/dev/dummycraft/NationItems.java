@@ -36,7 +36,7 @@ final class NationItems {
             if (user instanceof ServerPlayer player) {
                 Game.R result = DummyCraft.game.endTurn(player.getUUID());
                 player.sendSystemMessage(Component.literal(result.msg()));
-                player.playSound(result.ok() ? net.minecraft.sounds.SoundEvents.UI_TOAST_IN.value()
+                player.playSound(result.ok() ? net.minecraft.sounds.SoundEvents.UI_TOAST_IN
                                 : net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.value(),
                         0.8f, result.ok() ? 1.0f : 0.7f);
             }

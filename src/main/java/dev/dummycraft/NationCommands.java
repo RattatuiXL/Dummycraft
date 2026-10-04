@@ -178,7 +178,7 @@ final class NationCommands {
         else r = body.run(p, n, c);
         if (r != null) {
             p.sendSystemMessage(Component.literal(r.msg()).withStyle(r.ok() ? ChatFormatting.GREEN : ChatFormatting.RED));
-            p.playSound(r.ok() ? SoundEvents.UI_TOAST_IN.value() : SoundEvents.UI_BUTTON_CLICK.value(), 0.55f, r.ok() ? 1.0f : 0.8f);
+            p.playSound(r.ok() ? SoundEvents.UI_TOAST_IN : SoundEvents.UI_BUTTON_CLICK.value(), 0.55f, r.ok() ? 1.0f : 0.8f);
         }
         return r != null && r.ok() ? 1 : 0;
     }
@@ -199,7 +199,7 @@ final class NationCommands {
         ServerLevel level = (ServerLevel) p.level();
         int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz);
         p.teleportTo(bx + 0.5, y + 0.1, bz + 0.5);
-        p.playSound(SoundEvents.UI_TOAST_IN.value(), 0.8f, 1.0f);
+        p.playSound(SoundEvents.UI_TOAST_IN, 0.8f, 1.0f);
         NationItems.giveStarterKit(p);
         tutorial(p);
 

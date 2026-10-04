@@ -70,13 +70,13 @@ public class DummyCraft implements ModInitializer {
                             .append(Component.literal(msg).withStyle(ChatFormatting.WHITE));
                     for (ServerPlayer p : s.getPlayerList().getPlayers()) if (n.members.contains(p.getUUID())) {
                         p.sendSystemMessage(c);
-                        p.playSound(net.minecraft.sounds.SoundEvents.UI_TOAST_IN.value(), 0.5f, 1.1f);
+                        p.playSound(net.minecraft.sounds.SoundEvents.UI_TOAST_IN, 0.5f, 1.1f);
                     }
                 }
                 @Override public void toAll(String msg) {
                     s.getPlayerList().broadcastSystemMessage(Component.literal(msg).withStyle(ChatFormatting.GOLD), false);
                     for (ServerPlayer p : s.getPlayerList().getPlayers())
-                        p.playSound(net.minecraft.sounds.SoundEvents.UI_TOAST_IN.value(), 0.55f, 1.0f);
+                        p.playSound(net.minecraft.sounds.SoundEvents.UI_TOAST_IN, 0.55f, 1.0f);
                 }
             };
         });
@@ -277,7 +277,6 @@ public class DummyCraft implements ModInitializer {
                     int localZ = 2 + (type.ordinal() / 3) * 10;
                     BlockPos anchor = new BlockPos(cx * 16 + localX, ground, cz * 16 + localZ);
                     flag = new ItemFrame(EntityType.ITEM_FRAME, level, anchor, Direction.SOUTH);
-                    flag.setFixed(true);
                     flag.setInvulnerable(true);
                     flag.setSilent(true);
                     flag.setCustomNameVisible(true);
@@ -341,7 +340,7 @@ public class DummyCraft implements ModInitializer {
                 ? game.moveUnitsAlongLine(nation, type, amount, from, targetX, targetZ, player.isShiftKeyDown())
                 : game.attackUnits(nation, type, amount, from, targetX, targetZ);
         player.sendSystemMessage(Component.literal(result.msg()).withStyle(result.ok() ? ChatFormatting.GREEN : ChatFormatting.RED));
-        player.playSound(result.ok() ? net.minecraft.sounds.SoundEvents.UI_TOAST_IN.value()
+        player.playSound(result.ok() ? net.minecraft.sounds.SoundEvents.UI_TOAST_IN
                 : net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.value(), 0.65f, result.ok() ? 1.0f : 0.8f);
         if (result.ok()) selectedUnitStacks.remove(player.getUUID());
         return result.ok() ? InteractionResult.SUCCESS : InteractionResult.FAIL;
