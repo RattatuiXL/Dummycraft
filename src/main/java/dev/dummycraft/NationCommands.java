@@ -29,7 +29,7 @@ final class NationCommands {
     private static final String[] TUTORIAL = {
             "Welcome. Your coloured land is your country. The capital is always your richest city; each country has one to three cities.",
             "Cities earn extra gold: the capital earns the most, and other cities earn a smaller bonus. Yellow flags mark farms, black flags oil, and gray flags nuclear sites.",
-            "Right-click a troop flag to select that unit stack, then right-click friendly land to move. Crouch and right-click a farther tile to spread ground troops along the land route.",
+            "Right-click a troop flag to select that unit stack, then right-click friendly land to move. Crouch, then right-click a farther tile to spread ground troops evenly along a straight land route.",
             "Right-click the Field Guide to open the chest menu. Statistics shows income and ground, air, and water power; Army Store buys units and Upgrades improves your country.",
             "Buy troops with the gold and oil earned each round. The starter pack gives 20 infantry, 100 gold, and 10 oil. Use the menu to choose unit type, amount, and location.",
             "Ground troops need a connected friendly land route and cannot cross sea. Fighters, bombers, and ships can move farther; ships and aircraft cross water.",
@@ -39,7 +39,7 @@ final class NationCommands {
     private static final String[] TUTORIAL_RU = {
             "Добро пожаловать! Земля вашего цвета — ваша страна. Столица всегда самый богатый город; в каждой стране от одного до трёх городов.",
             "Города дают дополнительное золото: столица приносит больше всего, остальные города — меньше. Жёлтые флаги обозначают фермы, чёрные — нефть, серые — атомные станции.",
-            "Щёлкните правой кнопкой по флагу войск, чтобы выбрать отряд, затем щёлкните по своим землям для перемещения. Присядьте и щёлкните по дальней клетке, чтобы распределить пехоту вдоль сухопутного пути.",
+            "Щёлкните правой кнопкой по флагу войск, чтобы выбрать отряд, затем щёлкните по своим землям для перемещения. Присядьте, затем щёлкните правой кнопкой по дальней клетке, чтобы равномерно распределить пехоту вдоль сухопутного маршрута.",
             "Щёлкните правой кнопкой по Полевому справочнику, чтобы открыть меню-сундук. Статистика показывает доход и силу на земле, в воздухе и на воде; в магазине покупают войска, а улучшения усиливают страну.",
             "Покупайте войска за золото и нефть, получаемые каждый раунд. Стартовый набор содержит 20 пехотинцев, 100 золота и 10 нефти. В меню выберите тип войск, количество и место размещения.",
             "Наземным войскам нужен непрерывный дружественный сухопутный путь; море им не пройти. Истребители, бомбардировщики и корабли перемещаются дальше; самолёты и корабли пересекают воду.",

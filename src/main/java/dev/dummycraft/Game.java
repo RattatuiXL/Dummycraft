@@ -329,22 +329,31 @@ public class Game {
         if (amount < 1 || amount > have) return err("That tile has only " + have + " " + type.title + ".");
         List<String> path = new ArrayList<>();
         int x = cx(from), z = cz(from);
-        while (x != targetX) { x += Integer.signum(targetX - x); path.add(key(x, z)); }
-        while (z != targetZ) { z += Integer.signum(targetZ - z); path.add(key(x, z)); }
+        int dx = Math.abs(targetX - x), dz = Math.abs(targetZ - z);
+        int stepX = Integer.signum(targetX - x), stepZ = Integer.signum(targetZ - z);
+        int error = dx - dz;
+        while (x != targetX || z != targetZ) {
+            int twiceError = error * 2;
+            if (twiceError > -dz) { error -= dz; x += stepX; path.add(key(x, z)); }
+            if (twiceError < dx) { error += dx; z += stepZ; path.add(key(x, z)); }
+        }
         for (String tile : path) {
             if (!n.id.equals(owner.get(tile)) || waterChunks.contains(tile))
                 return err("Ground forces need a continuous friendly land route; sea cannot be crossed.");
         }
-        String previous = from;
-        int remaining = amount;
-        for (int i = 0; i < path.size(); i++) {
-            int moving = distribute && i < path.size() - 1
-                    ? Math.min(remaining, Math.max(1, amount / path.size())) : remaining;
-            if (moving > 0) stackMove(unitsAt(previous), unitsAt(path.get(i)), type, moving);
-            remaining -= moving;
-            previous = path.get(i);
+        if (distribute && amount > 1) {
+            original.compute(type.id(), (k, v) -> v == amount ? null : v - amount);
+            int[] shares = new int[path.size()];
+            for (int troop = 0; troop < amount; troop++) {
+                int routeIndex = (int) (((2L * troop + 1) * path.size()) / (2L * amount));
+                shares[Math.min(path.size() - 1, routeIndex)]++;
+            }
+            for (int i = 0; i < path.size(); i++)
+                if (shares[i] > 0) unitsAt(path.get(i)).merge(type.id(), shares[i], Integer::sum);
+        } else {
+            stackMove(original, unitsAt(target), type, amount);
         }
-        return ok(distribute ? "Moved " + amount + " " + type.title + " and spread them along the route." : "Moved " + amount + " " + type.title + " along friendly land to " + target + ".");
+        return ok(distribute ? "Moved " + amount + " " + type.title + " and spread them evenly along the route." : "Moved " + amount + " " + type.title + " along friendly land to " + target + ".");
     }
 
 
