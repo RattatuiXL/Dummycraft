@@ -39,15 +39,15 @@ public class DummyCraft implements ModInitializer {
 
     /** The one live game state (replaced when a server starts). */
     public static Game game = new Game();
-    private static MinecraftServer server;
+    
     private int ticks;
 
     @Override
     public void onInitialize() {
         NationItems.initialize();
         ServerLifecycleEvents.SERVER_STARTED.register(s -> {
-            server = s;
-            game = Store.load();
+            
+            game = Store.load(s);
             game.events = new Game.Events() {
                 @Override public void toNation(Game.Nation n, String msg) {
                     Component c = Component.literal("[" + n.name + "] ").withStyle(color(n))
@@ -64,7 +64,7 @@ public class DummyCraft implements ModInitializer {
                 }
             };
         });
-        ServerLifecycleEvents.SERVER_STOPPING.register(s -> Store.save(game));
+        ServerLifecycleEvents.SERVER_STOPPING.register(s -> Store.save(game, s));
         ServerTickEvents.END_SERVER_TICK.register(this::tick);
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
                 NationCommands.register(dispatcher));
@@ -101,7 +101,7 @@ public class DummyCraft implements ModInitializer {
     private void tick(MinecraftServer s) {
         ticks++;
         if (ticks % 20 == 0) game.tick();                 // economy + occupations, once per second
-        if (ticks % 6000 == 0) Store.save(game);          // autosave every 5 minutes
+        if (ticks % 6000 == 0) Store.save(game, s);          // autosave every 5 minutes
         if (ticks % 10 == 0)
             for (ServerPlayer p : s.getPlayerList().getPlayers()) { showChunk(p); showBorders(p); }
         if (ticks % 100 == 0) updateUnitMarkers(s.overworld());

@@ -48,4 +48,4 @@ Unit stacks appear in the world as labeled armor-stand markers with individual p
 - The project does not yet include alliances, research trees, chest/door protection, or a bespoke client-rendered screen. The main menu uses Minecraft's chest interface and familiar sounds.
 - This source has not been build-verified against the included Minecraft/Fabric versions. The original archive lacked a Gradle wrapper, and API differences may still need fixes before the first build.
 
-Game data is saved to `config/dummycraft.json`.
+Game data is saved to `data/dummycraft.json in each world's save folder`.

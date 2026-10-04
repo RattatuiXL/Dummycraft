@@ -2,7 +2,8 @@ package dev.dummycraft;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.level.storage.LevelResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -10,17 +11,20 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
-/** JSON persistence. Saved to config/dummycraft.json (one world per server). */
+/** JSON persistence scoped to the active Minecraft world. */
 final class Store {
     private static final Logger LOG = LoggerFactory.getLogger(DummyCraft.ID);
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
-    private static Path file() { return FabricLoader.getInstance().getConfigDir().resolve("dummycraft.json"); }
+    private static Path file(MinecraftServer server) {
+        return server.getWorldPath(LevelResource.ROOT).resolve("data").resolve("dummycraft.json");
+    }
 
-    static Game load() {
+    static Game load(MinecraftServer server) {
+        Path file = file(server);
         try {
-            if (Files.exists(file())) {
-                Game g = GSON.fromJson(Files.readString(file()), Game.class);
+            if (Files.exists(file)) {
+                Game g = GSON.fromJson(Files.readString(file), Game.class);
                 if (g != null) {
                     // Fill fields added after the first prototype's saves were written.
                     if (g.nations == null) g.nations = new java.util.LinkedHashMap<>();
@@ -46,19 +50,20 @@ final class Store {
                 }
             }
         } catch (Exception e) {
-            LOG.error("Could not read {}; starting with an empty world", file(), e);
+            LOG.error("Could not read {}; starting with an empty world", file, e);
         }
         return new Game();
     }
 
-    static void save(Game g) {
+    static void save(Game g, MinecraftServer server) {
+        Path file = file(server);
         try {
-            Files.createDirectories(file().getParent());
-            Path tmp = file().resolveSibling("dummycraft.json.tmp");
+            Files.createDirectories(file.getParent());
+            Path tmp = file.resolveSibling("dummycraft.json.tmp");
             Files.writeString(tmp, GSON.toJson(g));
-            Files.move(tmp, file(), StandardCopyOption.REPLACE_EXISTING);
+            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
         } catch (Exception e) {
-            LOG.error("Could not save {}", file(), e);
+            LOG.error("Could not save {}", file, e);
         }
     }
 }
