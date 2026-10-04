@@ -40,6 +40,8 @@ final class Store {
                     if (g.waterChunks == null) g.waterChunks = new java.util.HashSet<>();
                     for (Game.Nation n : g.nations.values()) {
                         if (n.borderColor == null) n.borderColor = n.color;
+                        if (n.cities == null) n.cities = new java.util.LinkedHashSet<>();
+                        if (n.capital != null) n.cities.add(n.capital);
                         if (n.upgrades == null) n.upgrades = new java.util.LinkedHashMap<>();
                         if (n.troops >= 1 && n.capital != null) {
                             int legacyTroops = (int)n.troops;

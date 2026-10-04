@@ -10,30 +10,42 @@ import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.particles.DustParticleOptions;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.decoration.ArmorStand;
-import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.gamerules.GameRules;
+import net.minecraft.world.level.block.entity.BannerPattern;
+import net.minecraft.world.level.block.entity.BannerPatternLayers;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+
+
 
 /** Entrypoint. Server-side only: vanilla clients can join a server running this mod. */
 public class DummyCraft implements ModInitializer {
@@ -43,6 +55,7 @@ public class DummyCraft implements ModInitializer {
     public static Game game = new Game();
     
     private int ticks;
+    private static final Map<UUID, String> selectedUnitStacks = new HashMap<>();
 
     @Override
     public void onInitialize() {
@@ -57,13 +70,13 @@ public class DummyCraft implements ModInitializer {
                             .append(Component.literal(msg).withStyle(ChatFormatting.WHITE));
                     for (ServerPlayer p : s.getPlayerList().getPlayers()) if (n.members.contains(p.getUUID())) {
                         p.sendSystemMessage(c);
-                        p.playSound(net.minecraft.sounds.SoundEvents.UI_TOAST_IN, 0.5f, 1.1f);
+                        p.playSound(net.minecraft.sounds.SoundEvents.UI_TOAST_IN.value(), 0.5f, 1.1f);
                     }
                 }
                 @Override public void toAll(String msg) {
                     s.getPlayerList().broadcastSystemMessage(Component.literal(msg).withStyle(ChatFormatting.GOLD), false);
                     for (ServerPlayer p : s.getPlayerList().getPlayers())
-                        p.playSound(net.minecraft.sounds.SoundEvents.UI_TOAST_IN, 0.55f, 1.0f);
+                        p.playSound(net.minecraft.sounds.SoundEvents.UI_TOAST_IN.value(), 0.55f, 1.0f);
                 }
             };
         });
@@ -86,15 +99,25 @@ public class DummyCraft implements ModInitializer {
         // unless their nation is at war with the owner (raiding is part of the game).
         PlayerBlockBreakEvents.BEFORE.register((level, player, pos, state, blockEntity) -> allowed(level, player, pos));
         UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
-            if (player.getItemInHand(hand).getItem() instanceof BlockItem
-                    && !allowed(level, player, hit.getBlockPos().relative(hit.getDirection()))) {
-                return InteractionResult.FAIL;
+            if (player instanceof ServerPlayer sp && level instanceof ServerLevel && hand == InteractionHand.MAIN_HAND) {
+                String selected = selectedUnitStacks.get(sp.getUUID());
+                if (selected != null) return commandSelectedStack(sp, selected, hit.getBlockPos());
             }
+            if (player.getItemInHand(hand).getItem() instanceof BlockItem
+                    && !allowed(level, player, hit.getBlockPos().relative(hit.getDirection())))
+                return InteractionResult.FAIL;
             return InteractionResult.PASS;
         });
-        UseEntityCallback.EVENT.register((player, level, hand, entity, hit) ->
-                entity instanceof ArmorStand stand && game.markerIds.containsValue(stand.getUUID().toString())
-                        ? InteractionResult.FAIL : InteractionResult.PASS);
+        UseEntityCallback.EVENT.register((player, level, hand, entity, hit) -> {
+            if (player instanceof ServerPlayer sp && entity instanceof ItemFrame frame) {
+                String marker = markerKey(frame);
+                if (marker != null) return selectUnitStack(sp, marker);
+            }
+            // Stop interaction with old mannequin markers saved by earlier mod versions.
+            return game.markerIds.containsValue(entity.getUUID().toString())
+                    ? InteractionResult.SUCCESS : InteractionResult.PASS;
+        });
+
     }
 
     private static void setWorldRules(MinecraftServer server) {
@@ -227,13 +250,12 @@ public class DummyCraft implements ModInitializer {
         }
     }
 
-    /** One persistent armor stand per unit stack gives vanilla clients a visible battlefield marker. */
+    /** Clickable banner frames show each deployed stack and act as its right-click selection marker. */
     private void updateUnitMarkers(ServerLevel level) {
         Set<String> wanted = new HashSet<>();
-        for (Map.Entry<String, java.util.Map<String, Integer>> chunk : game.garrisons.entrySet()) {
+        for (Map.Entry<String, Map<String, Integer>> chunk : game.garrisons.entrySet()) {
             int cx = Game.cx(chunk.getKey()), cz = Game.cz(chunk.getKey());
-            int x = cx * 16 + 8, z = cz * 16 + 8;
-            BlockPos base = new BlockPos(x, 0, z);
+            BlockPos base = new BlockPos(cx * 16 + 8, 0, cz * 16 + 8);
             if (!level.hasChunkAt(base)) continue;
             Game.Nation nation = game.ownerOf(chunk.getKey());
             if (nation == null) continue;
@@ -245,31 +267,32 @@ public class DummyCraft implements ModInitializer {
                 UUID id = null;
                 try { id = UUID.fromString(game.markerIds.get(key)); } catch (Exception ignored) { }
                 Entity found = id == null ? null : level.getEntity(id);
-                ArmorStand stand;
-                if (found instanceof ArmorStand existing) stand = existing;
+                ItemFrame flag;
+                if (found instanceof ItemFrame existing) flag = existing;
                 else {
-                    stand = new ArmorStand(EntityType.ARMOR_STAND, level);
-                    stand.setShowArms(true); stand.setNoGravity(true);
-                    stand.setInvulnerable(true); stand.setSilent(true); stand.setCustomNameVisible(true);
-                    stand.addTag("dummycraft.unit_marker");
-                    level.addFreshEntity(stand);
-                    game.markerIds.put(key, stand.getUUID().toString());
+                    if (found != null) found.discard();
+                    int ground = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,
+                            cx * 16 + 8, cz * 16 + 8);
+                    int localX = 2 + (type.ordinal() % 3) * 5;
+                    int localZ = 2 + (type.ordinal() / 3) * 10;
+                    BlockPos anchor = new BlockPos(cx * 16 + localX, ground, cz * 16 + localZ);
+                    flag = new ItemFrame(EntityType.ITEM_FRAME, level, anchor, Direction.SOUTH);
+                    flag.setFixed(true);
+                    flag.setInvulnerable(true);
+                    flag.setSilent(true);
+                    flag.setCustomNameVisible(true);
+                    flag.addTag("dummycraft.unit_flag");
+                    level.addFreshEntity(flag);
+                    game.markerIds.put(key, flag.getUUID().toString());
                 }
-                int ground = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
-                double angle = type.ordinal() * (Math.PI / 3.0);
-                double spreadX = Math.cos(angle) * 2.5, spreadZ = Math.sin(angle) * 2.5;
-                stand.setPos(x + 0.5 + spreadX, ground + (type.domain.equals("air") ? 3.0 : 0.1), z + 0.5 + spreadZ);
-                stand.setCustomName(Component.literal(stack.getValue() + " × " + type.title).withStyle(color(nation)));
-                stand.setItemSlot(EquipmentSlot.HEAD, new ItemStack(markerHelmet(type)));
-                stand.setItemSlot(EquipmentSlot.CHEST, new ItemStack(markerChest(type)));
-                stand.setItemSlot(EquipmentSlot.MAINHAND, new ItemStack(markerWeapon(type)));
+                flag.setItem(ornateUnitBanner(level, nation, key), false);
+                flag.setCustomName(Component.literal(stack.getValue() + " × " + type.title).withStyle(color(nation)));
             }
         }
         for (String key : new HashSet<>(game.markerIds.keySet())) {
             String chunkKey = key.substring(0, key.indexOf('|'));
             BlockPos pos = new BlockPos(Game.cx(chunkKey) * 16 + 8, 0, Game.cz(chunkKey) * 16 + 8);
-            if (!level.hasChunkAt(pos)) continue;
-            if (wanted.contains(key)) continue;
+            if (!level.hasChunkAt(pos) || wanted.contains(key)) continue;
             try {
                 Entity marker = level.getEntity(UUID.fromString(game.markerIds.get(key)));
                 if (marker != null) marker.discard();
@@ -278,17 +301,84 @@ public class DummyCraft implements ModInitializer {
         }
     }
 
-    private static net.minecraft.world.item.Item markerHelmet(UnitType type) {
-        return switch (type) { case INFANTRY -> NationItems.UNIT_INFANTRY; case TANK -> NationItems.UNIT_TANK;
-            case ARTILLERY -> NationItems.UNIT_ARTILLERY; case FIGHTER -> NationItems.UNIT_FIGHTER; case BOMBER -> NationItems.UNIT_BOMBER; case SHIP -> NationItems.UNIT_SHIP; };
+    private static String markerKey(Entity entity) {
+        String id = entity.getUUID().toString();
+        for (Map.Entry<String, String> marker : game.markerIds.entrySet())
+            if (id.equals(marker.getValue())) return marker.getKey();
+        return null;
     }
-    private static net.minecraft.world.item.Item markerChest(UnitType type) {
-        return switch (type) { case FIGHTER, BOMBER -> Items.ELYTRA; case TANK -> Items.IRON_CHESTPLATE; default -> Items.LEATHER_CHESTPLATE; };
+
+    private static InteractionResult selectUnitStack(ServerPlayer player, String marker) {
+        int split = marker.indexOf('|');
+        if (split <= 0) return InteractionResult.PASS;
+        String chunk = marker.substring(0, split);
+        UnitType type = UnitType.parse(marker.substring(split + 1));
+        Game.Nation nation = game.nationOf(player.getUUID());
+        if (nation == null || !nation.id.equals(game.owner.get(chunk)) || type == null) {
+            player.sendSystemMessage(Component.literal("You can only command your own troop flags.").withStyle(ChatFormatting.RED));
+            return InteractionResult.SUCCESS;
+        }
+        int amount = game.unitsAt(chunk).getOrDefault(type.id(), 0);
+        if (amount <= 0) return InteractionResult.SUCCESS;
+        selectedUnitStacks.put(player.getUUID(), marker);
+        player.sendSystemMessage(Component.literal("Selected " + amount + " " + type.title + " at " + chunk.replace(",", ", ")
+                + ". Right-click a destination; crouch-right-click spreads ground troops along the route.").withStyle(ChatFormatting.AQUA));
+        player.playSound(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.value(), 0.7f, 1.2f);
+        return InteractionResult.SUCCESS;
     }
-    private static net.minecraft.world.item.Item markerWeapon(UnitType type) {
-        return switch (type) { case INFANTRY -> Items.IRON_SWORD; case TANK -> Items.IRON_AXE; case ARTILLERY, FIGHTER -> Items.CROSSBOW;
-            case BOMBER -> Items.FIREWORK_ROCKET; case SHIP -> Items.TRIDENT; };
+
+    private static InteractionResult commandSelectedStack(ServerPlayer player, String marker, BlockPos clicked) {
+        int split = marker.indexOf('|');
+        if (split <= 0) { selectedUnitStacks.remove(player.getUUID()); return InteractionResult.PASS; }
+        String from = marker.substring(0, split);
+        UnitType type = UnitType.parse(marker.substring(split + 1));
+        Game.Nation nation = game.nationOf(player.getUUID());
+        if (nation == null || type == null) { selectedUnitStacks.remove(player.getUUID()); return InteractionResult.FAIL; }
+        int amount = game.unitsAt(from).getOrDefault(type.id(), 0);
+        int targetX = clicked.getX() >> 4, targetZ = clicked.getZ() >> 4;
+        Game.Nation targetNation = game.at(targetX, targetZ);
+        Game.R result = targetNation == nation
+                ? game.moveUnitsAlongLine(nation, type, amount, from, targetX, targetZ, player.isShiftKeyDown())
+                : game.attackUnits(nation, type, amount, from, targetX, targetZ);
+        player.sendSystemMessage(Component.literal(result.msg()).withStyle(result.ok() ? ChatFormatting.GREEN : ChatFormatting.RED));
+        player.playSound(result.ok() ? net.minecraft.sounds.SoundEvents.UI_TOAST_IN.value()
+                : net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.value(), 0.65f, result.ok() ? 1.0f : 0.8f);
+        if (result.ok()) selectedUnitStacks.remove(player.getUUID());
+        return result.ok() ? InteractionResult.SUCCESS : InteractionResult.FAIL;
     }
+
+    private static ItemStack ornateUnitBanner(ServerLevel level, Game.Nation nation, String marker) {
+        ItemStack banner = new ItemStack(nationBannerItem(nation.color));
+        String[] patterns = {"stripe_middle", "cross", "circle", "rhombus", "border", "triangle_top", "diagonal_left", "flower"};
+        Random random = new Random(game.mapSeed ^ marker.hashCode());
+        var registry = level.registryAccess().lookupOrThrow(Registries.BANNER_PATTERN);
+        BannerPatternLayers.Builder layers = new BannerPatternLayers.Builder();
+        for (int i = 0; i < 2; i++) {
+            ResourceKey<BannerPattern> key = ResourceKey.create(Registries.BANNER_PATTERN,
+                    Identifier.fromNamespaceAndPath("minecraft", patterns[random.nextInt(patterns.length)]));
+            layers.add(registry.getOrThrow(key), i == 0 ? DyeColor.WHITE : DyeColor.BLACK);
+        }
+        banner.set(DataComponents.BANNER_PATTERNS, layers.build());
+        return banner;
+    }
+
+    private static net.minecraft.world.item.Item nationBannerItem(String color) {
+        return switch (color == null ? "" : color) {
+            case "RED" -> Items.RED_BANNER;
+            case "BLUE" -> Items.BLUE_BANNER;
+            case "GREEN", "DARK_GREEN" -> Items.GREEN_BANNER;
+            case "YELLOW" -> Items.YELLOW_BANNER;
+            case "LIGHT_PURPLE" -> Items.MAGENTA_BANNER;
+            case "AQUA" -> Items.CYAN_BANNER;
+            case "GOLD" -> Items.ORANGE_BANNER;
+            case "DARK_AQUA" -> Items.LIGHT_BLUE_BANNER;
+            case "DARK_PURPLE" -> Items.PURPLE_BANNER;
+            case "DARK_RED" -> Items.BROWN_BANNER;
+            default -> Items.WHITE_BANNER;
+        };
+    }
+
+
 
     /** Action bar: who owns the chunk you stand in, its resource type, and occupation progress. */
     private void showChunk(ServerPlayer p) {

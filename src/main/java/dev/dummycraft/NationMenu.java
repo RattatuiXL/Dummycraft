@@ -44,9 +44,9 @@ final class NationMenu extends ChestMenu {
         open(p, g, Page.HOME, x, z, x, z, 1, null);
     }
     static void openTutorial(ServerPlayer p, Game g) {
-        open(p, g, Page.TUTORIAL, p.blockPosition().getX() >> 4, p.blockPosition().getZ() >> 4,
-                p.blockPosition().getX() >> 4, p.blockPosition().getZ() >> 4, 1, null);
+        NationCommands.tutorial(p);
     }
+
 
     private static void open(ServerPlayer p, Game g, Page page, int sx, int sz, int tx, int tz, int amount, UnitType selected) {
         String title = switch (page) {
@@ -81,7 +81,7 @@ final class NationMenu extends ChestMenu {
                 else if (slot == 25) reopen(Page.BORDERS, sourceX, sourceZ, targetX, targetZ, amount, selected);
                 else if (slot == 28) reopen(Page.TARGETS, sourceX, sourceZ, targetX, targetZ, amount, selected);
                 else if (slot == 31) { Game.R r = game.endTurn(player.getUUID()); report(r); }
-                else if (slot == 34) reopen(Page.TUTORIAL, sourceX, sourceZ, targetX, targetZ, amount, selected);
+                else if (slot == 34) NationCommands.tutorial(player);
                 else if (slot == 49) reopen(Page.UNITS, sourceX, sourceZ, targetX, targetZ, amount, selected);
             }
             case SHOP -> {
@@ -178,7 +178,7 @@ final class NationMenu extends ChestMenu {
         if (n == null) return;
         switch (page) {
             case HOME -> {
-                put(4, Items.PAPER, n.name + "  |  Round " + game.round);
+                put(4, Items.PAPER, n.name + "  |  " + game.citiesOf(n) + "/3 cities  |  Round " + game.round);
                 put(10, Items.IRON_SWORD, "Army store and unit types");
                 put(13, Items.MAP, "Map and territory");
                 put(16, Items.ANVIL, "Power and defense upgrades");
@@ -186,7 +186,7 @@ final class NationMenu extends ChestMenu {
                 put(25, Items.GLOWSTONE_DUST, "Bright border line colour");
                 put(28, Items.COMPASS, "Deploy / attack from this chunk");
                 put(31, Items.BELL, "End turn  |  right-click bell item also works");
-                put(34, Items.BOOK, "Beginner tutorial");
+                put(34, Items.BOOK, "Text tutorial  |  /nation tutorial ru for Russian");
                 put(49, Items.GOLD_INGOT, "Buy units");
                 if (game.turnBased && game.activeNation() != null)
                     put(22, Items.CLOCK, "Current turn: " + game.activeNation().name);
@@ -279,8 +279,10 @@ final class NationMenu extends ChestMenu {
         put(26, Items.TURTLE_HELMET, "Water defense " + (int)game.power(n, "water", true));
         put(28, Items.LIME_STAINED_GLASS, "Territory chunks " + game.chunksOf(n));
         put(30, Items.IRON_SWORD, "Total units " + game.unitCount(n));
+        put(32, Items.CYAN_BANNER, "Cities " + game.citiesOf(n) + "/3  |  Capital: " + n.capital.replace(",", ", ") + " earns most");
         put(49, Items.ARROW, "Back");
     }
+
 
     private void drawBorderColors(Game.Nation n) {
         put(4, Items.GLOWSTONE_DUST, "Choose a bright border hue for " + n.name);

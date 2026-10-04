@@ -23,7 +23,7 @@ final class NationItems {
         @Override public InteractionResult use(Level level, Player user, InteractionHand hand) {
             if (level.isClientSide()) return InteractionResult.SUCCESS;
             if (user instanceof ServerPlayer player) {
-                if (DummyCraft.game.nationOf(player.getUUID()) == null) NationMenu.openTutorial(player, DummyCraft.game);
+                if (DummyCraft.game.nationOf(player.getUUID()) == null) NationCommands.tutorial(player);
                 else NationMenu.open(player, DummyCraft.game);
             }
             return InteractionResult.SUCCESS;
@@ -36,7 +36,7 @@ final class NationItems {
             if (user instanceof ServerPlayer player) {
                 Game.R result = DummyCraft.game.endTurn(player.getUUID());
                 player.sendSystemMessage(Component.literal(result.msg()));
-                player.playSound(result.ok() ? net.minecraft.sounds.SoundEvents.UI_TOAST_IN
+                player.playSound(result.ok() ? net.minecraft.sounds.SoundEvents.UI_TOAST_IN.value()
                                 : net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK.value(),
                         0.8f, result.ok() ? 1.0f : 0.7f);
             }

@@ -26,16 +26,25 @@ import java.util.function.Function;
 /** /nation ... command tree. All rules live in {@link Game}; this only translates input and output. */
 final class NationCommands {
     private static final int NATION = 1, LEADER = 2, OVERWORLD = 4;
-    private static final Map<UUID, Integer> TUTORIAL_PROGRESS = new HashMap<>();
     private static final String[] TUTORIAL = {
-            "Terracotta in your nation's colour marks its land. Your capital starts with 20 infantry, 100 gold and 10 oil. Right-click your Field Guide to open the menu.",
-            "Farms make infantry, oilfields make oil, and plains make mixed income. Statistics shows what your land earns each round.",
-            "Open Army Store, pick Ground, Air or Water, then click a unit. Left-click buys one; right-click buys five.",
-            "Open Deploy while on your land. Pick a nearby chunk, unit and amount, then click the sword. Ground forces stay on land; aircraft and ships cross sea.",
-            "Empty land can be captured by attacking it. Declare war before attacking another nation. Sea cannot be captured.",
-            "Upgrades improve income or attack and defense for ground, air and water forces. Statistics shows each defense separately.",
-            "After your moves, right-click the End Turn Bell. Income and battles resolve as the randomized turn order advances.",
-            "Tutorial complete! Use /nation tutorial restart whenever you want to see it again."
+            "Welcome. Your coloured land is your country. The capital is always your richest city; each country has one to three cities.",
+            "Cities earn extra gold: the capital earns the most, and other cities earn a smaller bonus. Yellow flags mark farms, black flags oil, and gray flags nuclear sites.",
+            "Right-click a troop flag to select that unit stack, then right-click friendly land to move. Crouch and right-click a farther tile to spread ground troops along the land route.",
+            "Right-click the Field Guide to open the chest menu. Statistics shows income and ground, air, and water power; Army Store buys units and Upgrades improves your country.",
+            "Buy troops with the gold and oil earned each round. The starter pack gives 20 infantry, 100 gold, and 10 oil. Use the menu to choose unit type, amount, and location.",
+            "Ground troops need a connected friendly land route and cannot cross sea. Fighters, bombers, and ships can move farther; ships and aircraft cross water.",
+            "Attack neighboring empty land with a selected troop flag and right-click the target. Declare war before attacking another country. Turn order is random; ring the End Turn Bell when finished.",
+            "Rename your country with /nation rename <name>. Type /nation tutorial ru for this guide in Russian, /nation info for your numbers, and /nation menu for the chest menu."
+    };
+    private static final String[] TUTORIAL_RU = {
+            "Добро пожаловать! Земля вашего цвета — ваша страна. Столица всегда самый богатый город; в каждой стране от одного до трёх городов.",
+            "Города дают дополнительное золото: столица приносит больше всего, остальные города — меньше. Жёлтые флаги обозначают фермы, чёрные — нефть, серые — атомные станции.",
+            "Щёлкните правой кнопкой по флагу войск, чтобы выбрать отряд, затем щёлкните по своим землям для перемещения. Присядьте и щёлкните по дальней клетке, чтобы распределить пехоту вдоль сухопутного пути.",
+            "Щёлкните правой кнопкой по Полевому справочнику, чтобы открыть меню-сундук. Статистика показывает доход и силу на земле, в воздухе и на воде; в магазине покупают войска, а улучшения усиливают страну.",
+            "Покупайте войска за золото и нефть, получаемые каждый раунд. Стартовый набор содержит 20 пехотинцев, 100 золота и 10 нефти. В меню выберите тип войск, количество и место размещения.",
+            "Наземным войскам нужен непрерывный дружественный сухопутный путь; море им не пройти. Истребители, бомбардировщики и корабли перемещаются дальше; самолёты и корабли пересекают воду.",
+            "Атакуйте соседнюю ничейную землю: выберите флаг войск и щёлкните по цели. Перед атакой другой страны объявите ей войну. Порядок ходов случаен; завершите ход звонком в колокол.",
+            "Переименуйте страну командой /nation rename <название>. Введите /nation tutorial en для английского текста, /nation stats для статистики или /nation menu для меню-сундука."
     };
 
 
@@ -71,6 +80,9 @@ final class NationCommands {
         nation.then(Commands.literal("create").then(Commands.argument("name", StringArgumentType.word())
                 .executes(c -> run(c, OVERWORLD, (p, n, ctx) ->
                         createNation(p, StringArgumentType.getString(ctx, "name"))))));
+        nation.then(Commands.literal("rename").then(Commands.argument("name", StringArgumentType.greedyString())
+                .executes(c -> run(c, NATION | LEADER, (p, n, ctx) ->
+                        DummyCraft.game.rename(n, StringArgumentType.getString(ctx, "name"))))));
         nation.then(Commands.literal("info")
                 .executes(c -> run(c, NATION, (p, n, ctx) -> { info(p, n); return null; }))
                 .then(Commands.argument("nation", StringArgumentType.word()).suggests(NAMES)
@@ -84,10 +96,19 @@ final class NationCommands {
                         DummyCraft.game.setBorderColor(n, StringArgumentType.getString(ctx, "color"))))));
         nation.then(Commands.literal("endturn").executes(c -> run(c, 0, (p, n, ctx) -> DummyCraft.game.endTurn(p.getUUID()))));
         LiteralArgumentBuilder<CommandSourceStack> tutorial = Commands.literal("tutorial")
-                .executes(c -> run(c, 0, (p, n, ctx) -> { startTutorial(p); return null; }));
-        tutorial.then(Commands.literal("next").executes(c -> run(c, 0, (p, n, ctx) -> { nextTutorial(p); return null; })));
-        tutorial.then(Commands.literal("restart").executes(c -> run(c, 0, (p, n, ctx) -> { startTutorial(p); return null; })));
+                .executes(c -> run(c, 0, (p, n, ctx) -> { tutorial(p, "en"); return null; }));
+        tutorial.then(Commands.argument("language", StringArgumentType.word())
+                .executes(c -> run(c, 0, (p, n, ctx) -> {
+                    String language = StringArgumentType.getString(ctx, "language");
+                    if (!language.equalsIgnoreCase("en") && !language.equalsIgnoreCase("ru")
+                            && !language.equalsIgnoreCase("english") && !language.equalsIgnoreCase("russian"))
+                        return Game.err("Choose /nation tutorial en or /nation tutorial ru.");
+                    tutorial(p, language);
+                    return null;
+                })));
         nation.then(tutorial);
+
+
         nation.then(Commands.literal("recruit").then(Commands.argument("amount", IntegerArgumentType.integer(1, 1000))
                 .executes(c -> run(c, NATION, (p, n, ctx) ->
                         DummyCraft.game.recruit(n, IntegerArgumentType.getInteger(ctx, "amount"))))));
@@ -157,7 +178,7 @@ final class NationCommands {
         else r = body.run(p, n, c);
         if (r != null) {
             p.sendSystemMessage(Component.literal(r.msg()).withStyle(r.ok() ? ChatFormatting.GREEN : ChatFormatting.RED));
-            p.playSound(r.ok() ? SoundEvents.UI_TOAST_IN : SoundEvents.UI_BUTTON_CLICK.value(), 0.55f, r.ok() ? 1.0f : 0.8f);
+            p.playSound(r.ok() ? SoundEvents.UI_TOAST_IN.value() : SoundEvents.UI_BUTTON_CLICK.value(), 0.55f, r.ok() ? 1.0f : 0.8f);
         }
         return r != null && r.ok() ? 1 : 0;
     }
@@ -178,10 +199,10 @@ final class NationCommands {
         ServerLevel level = (ServerLevel) p.level();
         int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx, bz);
         p.teleportTo(bx + 0.5, y + 0.1, bz + 0.5);
-        p.playSound(SoundEvents.UI_TOAST_IN, 0.8f, 1.0f);
+        p.playSound(SoundEvents.UI_TOAST_IN.value(), 0.8f, 1.0f);
         NationItems.giveStarterKit(p);
         tutorial(p);
-        NationMenu.openTutorial(p, DummyCraft.game);
+
         return result;
     }
 
@@ -190,7 +211,7 @@ final class NationCommands {
         if (result.ok()) {
             NationItems.giveStarterKit(p);
             tutorial(p);
-            NationMenu.openTutorial(p, DummyCraft.game);
+    
         }
         return result;
     }
@@ -203,11 +224,12 @@ final class NationCommands {
             "/nation map            - territory map around you",
             "/nation borders        - show or hide particle borders (on by default)",
             "/nation bordercolor <color> - change your bright ground-line hue (nation leader)",
+            "/nation rename <name> - set your own nation name (leader)",
             "/start                 - generate randomized countries; /start as <name> or /start random to choose",
             "/start order           - reshuffle turn order between already-created nations",
             "/nation endturn        - end your nation's turn; income arrives after every nation moves",
             "/nation menu           - open the chest menu; guide and bell are in your starter kit",
-            "/nation tutorial       - beginner guide",
+            "/nation tutorial [en|ru] - full text tutorial in English or Russian",
             "/nation info [nation]  - stats; /nation list - ranking",
             "/nation recruit <n>    - turn gold into troops (5 gold each)",
             "/nation buy <unit> <n> - buy infantry, tank, artillery, fighter, bomber or ship at your current chunk",
@@ -221,34 +243,34 @@ final class NationCommands {
         for (String l : lines) p.sendSystemMessage(Component.literal(l).withStyle(ChatFormatting.YELLOW));
     }
 
-    private static void tutorial(ServerPlayer p) { startTutorial(p); }
+    static void tutorial(ServerPlayer p) { tutorial(p, "en"); }
 
-    static int tutorialNumber(UUID player) { return TUTORIAL_PROGRESS.getOrDefault(player, 0); }
-
-    static void startTutorial(ServerPlayer player) {
-        TUTORIAL_PROGRESS.put(player.getUUID(), 0);
-        nextTutorial(player);
-    }
-
-    static void nextTutorial(ServerPlayer player) {
-        int step = TUTORIAL_PROGRESS.getOrDefault(player.getUUID(), 0);
-        if (step >= TUTORIAL.length) step = TUTORIAL.length - 1;
-        else TUTORIAL_PROGRESS.put(player.getUUID(), step + 1);
-        player.sendSystemMessage(Component.literal("Dymmynation tutorial • Lesson " + (step + 1) + " of " + TUTORIAL.length)
+    private static void tutorial(ServerPlayer p, String language) {
+        boolean russian = language.equalsIgnoreCase("ru") || language.equalsIgnoreCase("russian");
+        String[] lines = russian ? TUTORIAL_RU : TUTORIAL;
+        p.sendSystemMessage(Component.literal("Dymmynation — " + (russian ? "обучение" : "quick tutorial"))
                 .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
-        player.sendSystemMessage(Component.literal(TUTORIAL[step]).withStyle(ChatFormatting.WHITE));
-        if (step + 1 < TUTORIAL.length)
-            player.sendSystemMessage(Component.literal("Click Next lesson in the guide or type /nation tutorial next.").withStyle(ChatFormatting.AQUA));
-        else player.sendSystemMessage(Component.literal("Tutorial complete. Type /nation tutorial restart to begin again.").withStyle(ChatFormatting.GREEN));
+        for (int i = 0; i < lines.length; i++)
+            p.sendSystemMessage(Component.literal((i + 1) + ". " + lines[i]).withStyle(ChatFormatting.WHITE));
+        p.sendSystemMessage(Component.literal(russian
+                ? "Перевод: /nation tutorial en"
+                : "Russian text: /nation tutorial ru").withStyle(ChatFormatting.AQUA));
     }
+
+    // Compatibility hooks for the old menu page; all now print the full chat guide.
+    static int tutorialNumber(UUID player) { return 0; }
+    static void startTutorial(ServerPlayer player) { tutorial(player); }
+    static void nextTutorial(ServerPlayer player) { tutorial(player); }
+
+
 
     private static void info(ServerPlayer p, Game.Nation n) {
         Game g = DummyCraft.game;
         int chunks = g.chunksOf(n);
         p.sendSystemMessage(Component.literal("== " + n.name + " ==").withStyle(DummyCraft.color(n), ChatFormatting.BOLD));
         p.sendSystemMessage(Component.literal(String.format(Locale.ROOT,
-                "Chunks %d (efficiency %d%%) | Gold %d | Oil %d | Units %d (+%d deployed) | Score %d",
-                chunks, Math.round(g.efficiency(n, chunks) * 100), (int) n.gold, (int) n.oil,
+                "Chunks %d | Cities %d | Gold %d | Oil %d | Units %d (+%d deployed) | Score %d",
+                chunks, g.citiesOf(n), (int) n.gold, (int) n.oil,
                 g.unitCount(n), (int) g.deployed(n), (int) g.score(n))));
         double[] income = g.incomePerRound(n);
         p.sendSystemMessage(Component.literal(String.format(Locale.ROOT,
