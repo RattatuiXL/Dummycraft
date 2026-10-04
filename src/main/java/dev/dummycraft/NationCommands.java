@@ -141,7 +141,7 @@ final class NationCommands {
         else r = body.run(p, n, c);
         if (r != null) {
             p.sendSystemMessage(Component.literal(r.msg()).withStyle(r.ok() ? ChatFormatting.GREEN : ChatFormatting.RED));
-            p.playSound(r.ok() ? SoundEvents.UI_TOAST_IN : SoundEvents.UI_BUTTON_CLICK, 0.55f, r.ok() ? 1.0f : 0.8f);
+            p.playSound(r.ok() ? SoundEvents.UI_TOAST_IN : SoundEvents.UI_BUTTON_CLICK.value(), 0.55f, r.ok() ? 1.0f : 0.8f);
         }
         return r != null && r.ok() ? 1 : 0;
     }
