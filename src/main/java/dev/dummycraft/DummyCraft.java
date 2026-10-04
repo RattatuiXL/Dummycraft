@@ -28,7 +28,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.gamerules.GameRules;
 
 import java.util.HashSet;
 import java.util.Map;
@@ -99,16 +99,16 @@ public class DummyCraft implements ModInitializer {
 
     private static void setWorldRules(MinecraftServer server) {
         for (ServerLevel level : server.getAllLevels()) {
-            level.getGameRules().getRule(GameRules.RULE_DAYLIGHT).set(false, server);
-            level.getGameRules().getRule(GameRules.RULE_DOMOBSPAWNING).set(false, server);
+            level.getGameRules().set(GameRules.ADVANCE_TIME, false, server);
+            level.getGameRules().set(GameRules.SPAWN_MOBS, false, server);
         }
-        server.overworld().setDayTime(1000L);
+        server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), "time set day");
     }
 
     static Game.R generateMap(ServerPlayer host) {
         Game.R result = game.generateMap(host.blockPosition().getX() >> 4, host.blockPosition().getZ() >> 4);
         if (!result.ok()) return result;
-        MinecraftServer server = host.getServer();
+        MinecraftServer server = host.level().getServer();
         if (server != null) {
             setWorldRules(server);
             WorldMapGenerator.generate(server.overworld(), game);
