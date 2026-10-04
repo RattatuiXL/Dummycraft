@@ -57,7 +57,7 @@ final class NationMenu extends ChestMenu {
         };
         p.openMenu(new SimpleMenuProvider((id, inventory, who) -> new NationMenu(id, inventory,
                 new SimpleContainer(54), g, p, page, sx, sz, tx, tz, amount, selected), Component.literal(title)));
-        p.playSound(SoundEvents.UI_BUTTON_CLICK, 0.65f, 1.1f);
+        p.playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.65f, 1.1f);
     }
 
     @Override
@@ -140,7 +140,7 @@ final class NationMenu extends ChestMenu {
                 if (slot == 49) reopen(Page.HOME, sourceX, sourceZ, targetX, targetZ, amount, selected);
             }
         }
-        player.playSound(SoundEvents.UI_BUTTON_CLICK, 0.6f, 1.2f);
+        player.playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.6f, 1.2f);
     }
 
     private void report(Game.R result) {
