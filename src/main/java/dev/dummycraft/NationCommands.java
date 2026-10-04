@@ -46,6 +46,7 @@ final class NationCommands {
 
             .then(Commands.literal("list").executes(c -> run(c, 0, (p, n, ctx) -> { list(p); return null; })))
             .then(Commands.literal("map").executes(c -> run(c, OVERWORLD, (p, n, ctx) -> { map(p); return null; })))
+            .then(Commands.literal("borders").executes(c -> run(c, 0, (p, n, ctx) -> DummyCraft.toggleBorders(p))))
 
             .then(Commands.literal("recruit").then(Commands.argument("amount", IntegerArgumentType.integer(1, 1000))
                 .executes(c -> run(c, NATION, (p, n, ctx) ->
@@ -109,6 +110,7 @@ final class NationCommands {
         String[] lines = {
             "/nation create <name>  - found a nation; your current chunk becomes the capital",
             "/nation map            - territory map around you",
+            "/nation borders        - show or hide particle borders (on by default)",
             "/nation info [nation]  - stats; /nation list - ranking",
             "/nation recruit <n>    - turn gold into troops (5 gold each)",
             "/nation attack <n>     - send n troops to occupy the chunk you stand in (must border your land)",
