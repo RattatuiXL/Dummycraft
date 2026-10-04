@@ -1,0 +1,6 @@
+{
+  "textures": {
+    "layer0": "dummycraft:item/unit_tank"
+  },
+  "parent": "minecraft:item/generated"
+}

@@ -1,0 +1,6 @@
+{
+  "textures": {
+    "layer0": "dummycraft:item/unit_bomber"
+  },
+  "parent": "minecraft:item/generated"
+}
