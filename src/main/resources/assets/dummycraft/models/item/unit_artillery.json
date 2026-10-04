@@ -1,0 +1,6 @@
+{
+  "textures": {
+    "layer0": "dummycraft:item/unit_artillery"
+  },
+  "parent": "minecraft:item/generated"
+}

@@ -1,0 +1,6 @@
+{
+  "textures": {
+    "layer0": "dummycraft:item/unit_ship"
+  },
+  "parent": "minecraft:item/generated"
+}
