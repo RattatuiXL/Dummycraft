@@ -7,6 +7,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleOptions;
@@ -27,6 +28,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.GameRules;
 
 import java.util.HashSet;
 import java.util.Map;
@@ -48,6 +50,7 @@ public class DummyCraft implements ModInitializer {
         ServerLifecycleEvents.SERVER_STARTED.register(s -> {
             
             game = Store.load(s);
+            setWorldRules(s);
             game.events = new Game.Events() {
                 @Override public void toNation(Game.Nation n, String msg) {
                     Component c = Component.literal("[" + n.name + "] ").withStyle(color(n))
@@ -63,6 +66,16 @@ public class DummyCraft implements ModInitializer {
                         p.playSound(net.minecraft.sounds.SoundEvents.UI_TOAST_IN, 0.55f, 1.0f);
                 }
             };
+        });
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+            ServerPlayer player = handler.player;
+            if (!game.mapGenerated || player.level().dimension() != Level.OVERWORLD) return;
+            Game.Nation nation = game.nationOf(player.getUUID());
+            int chunkX = nation == null ? game.mapCenterX : Game.cx(nation.capital);
+            int chunkZ = nation == null ? game.mapCenterZ : Game.cz(nation.capital);
+            int x = chunkX * 16 + 8, z = chunkZ * 16 + 8;
+            int y = server.overworld().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+            player.teleportTo(x + 0.5, y + 0.1, z + 0.5);
         });
         ServerLifecycleEvents.SERVER_STOPPING.register(s -> Store.save(game, s));
         ServerTickEvents.END_SERVER_TICK.register(this::tick);
@@ -82,6 +95,30 @@ public class DummyCraft implements ModInitializer {
         UseEntityCallback.EVENT.register((player, level, hand, entity, hit) ->
                 entity instanceof ArmorStand stand && game.markerIds.containsValue(stand.getUUID().toString())
                         ? InteractionResult.FAIL : InteractionResult.PASS);
+    }
+
+    private static void setWorldRules(MinecraftServer server) {
+        for (ServerLevel level : server.getAllLevels()) {
+            level.getGameRules().getRule(GameRules.RULE_DAYLIGHT).set(false, server);
+            level.getGameRules().getRule(GameRules.RULE_DOMOBSPAWNING).set(false, server);
+        }
+        server.overworld().setDayTime(1000L);
+    }
+
+    static Game.R generateMap(ServerPlayer host) {
+        Game.R result = game.generateMap(host.blockPosition().getX() >> 4, host.blockPosition().getZ() >> 4);
+        if (!result.ok()) return result;
+        MinecraftServer server = host.getServer();
+        if (server != null) {
+            setWorldRules(server);
+            WorldMapGenerator.generate(server.overworld(), game);
+            int x = game.mapCenterX * 16 + 8, z = game.mapCenterZ * 16 + 8;
+            int y = server.overworld().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+            for (ServerPlayer player : server.getPlayerList().getPlayers())
+                if (player.level().dimension() == Level.OVERWORLD) player.teleportTo(x + 0.5, y + 0.1, z + 0.5);
+            Store.save(game, server);
+        }
+        return result;
     }
 
     public static ChatFormatting color(Game.Nation n) {
@@ -162,7 +199,11 @@ public class DummyCraft implements ModInitializer {
         float r = (((rgb >> 16) & 255) / 255f) * 0.58f + 0.42f;
         float g = (((rgb >> 8) & 255) / 255f) * 0.58f + 0.42f;
         float b = ((rgb & 255) / 255f) * 0.58f + 0.42f;
-        return new DustParticleOptions(rgb, 1.35f);
+        int brightR = (int) (((rgb >> 16) & 255) * 0.52f + 255 * 0.48f);
+        int brightG = (int) (((rgb >> 8) & 255) * 0.52f + 255 * 0.48f);
+        int brightB = (int) ((rgb & 255) * 0.52f + 255 * 0.48f);
+        int brightRgb = (brightR << 16) | (brightG << 8) | brightB;
+        return new DustParticleOptions(brightRgb, 1.6f);
     }
 
     private static void drawEdge(ServerLevel level, int x, int z, int[] d, ParticleOptions type) {

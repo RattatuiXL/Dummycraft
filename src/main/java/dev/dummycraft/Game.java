@@ -10,6 +10,9 @@ import java.util.*;
 public class Game {
     public static final double START_GOLD = 100, START_OIL = 10, START_TROOPS = 20, RECRUIT_COST = 5;
     public static final int MIN_ATTACK = 5;
+    public static final int MAP_RADIUS = 8;
+    public static final int MAP_SURFACE_Y = 64;
+    public static final int SEA_TRAVEL_RANGE = 12;
     public static final double CAPITAL_GOLD = 0.5;   // flat gold/s from the capital, whatever its terrain
     public static final double UPKEEP = 0.005;       // gold/s per troop
     public static final double TURN_ECONOMY_SCALE = 20.0; // convert prototype per-second yields into useful per-round yields
@@ -33,6 +36,9 @@ public class Game {
     public Map<String, String> markerIds = new HashMap<>();
     public boolean mapGenerated;
     public long mapSeed;
+    public int mapCenterX, mapCenterZ;
+    public Set<String> mapChunks = new HashSet<>();
+    public Set<String> waterChunks = new HashSet<>();
     public List<String> scenarioCountries = new ArrayList<>();
     /** Optional turn-based mode; order and round survive a server restart. */
     public boolean turnBased;
@@ -73,6 +79,8 @@ public class Game {
     // ---------------------------------------------------------------- helpers
 
     public static String key(int x, int z) { return x + "," + z; }
+    public boolean isWater(int x, int z) { return waterChunks.contains(key(x, z)); }
+    public boolean isBoard(int x, int z) { return mapChunks.contains(key(x, z)); }
     public static int cx(String k) { return Integer.parseInt(k.substring(0, k.indexOf(','))); }
     public static int cz(String k) { return Integer.parseInt(k.substring(k.indexOf(',') + 1)); }
 
@@ -170,6 +178,7 @@ public class Game {
 
     /** Wilderness is open; your own land is open; enemy land is open to raiders (you are at war). */
     public boolean canBuild(UUID p, int x, int z) {
+        if (waterChunks.contains(key(x, z))) return false;
         Nation o = at(x, z);
         if (o == null) return true;
         Nation mine = nationOf(p);
@@ -267,6 +276,11 @@ public class Game {
         if (!hasTurn(n)) return err("Wait for your nation's turn before moving units.");
         if (type == null) return err("Unknown unit type.");
         if (amount < 1 || !n.id.equals(owner.get(from)) || !n.id.equals(owner.get(to))) return err("Choose an amount and two chunks you own.");
+        int distance = Math.abs(cx(from) - cx(to)) + Math.abs(cz(from) - cz(to));
+        if (type.domain.equals("ground") && distance != 1)
+            return err("Ground troops move only to neighboring land; they cannot cross sea.");
+        if (!type.domain.equals("ground") && (distance < 1 || distance > SEA_TRAVEL_RANGE))
+            return err("Air and ship forces can redeploy up to " + SEA_TRAVEL_RANGE + " chunks.");
         if (Math.abs(cx(from) - cx(to)) + Math.abs(cz(from) - cz(to)) != 1) return err("Move between neighboring chunks only.");
         Map<String, Integer> source = unitsAt(from);
         int have = source.getOrDefault(type.id(), 0);
@@ -284,6 +298,13 @@ public class Game {
         if (!n.id.equals(owner.get(from))) return err("Stand on one of your own chunks to launch the attack.");
         if (defender == n) return err("You already own that chunk.");
         if (defender != null && !n.enemies.contains(defender.id)) return err("Declare war on " + defender.name + " first.");
+        if (mapGenerated && !isBoard(targetX, targetZ)) return err("That target is outside the generated game map.");
+        if (waterChunks.contains(target)) return err("That target is sea. Sea can be crossed by air or ships, not captured.");
+        int distance = Math.abs(cx(from) - targetX) + Math.abs(cz(from) - targetZ);
+        if (type.domain.equals("ground") && distance != 1)
+            return err("Ground forces can attack neighboring land only; sea blocks them.");
+        if (!type.domain.equals("ground") && (distance < 1 || distance > SEA_TRAVEL_RANGE))
+            return err("Air and ship forces can attack across up to " + SEA_TRAVEL_RANGE + " chunks.");
         if (Math.abs(cx(from) - targetX) + Math.abs(cz(from) - targetZ) != 1) return err("Attack a neighboring chunk.");
         if (opAt(targetX, targetZ) != null) return err("That chunk already has an active attack.");
         Map<String, Integer> source = unitsAt(from);
@@ -316,15 +337,22 @@ public class Game {
     public R generateMap(int centerX, int centerZ) {
         if (mapGenerated) return err("The country map is already ready. Choose a country with /start as <name>.");
         if (!nations.isEmpty()) return err("A nation game already exists in this save. Use a fresh world for generated country selection.");
-        mapGenerated = true;
+        
         mapSeed = new Random().nextLong();
         Random random = new Random(mapSeed);
+        mapCenterX = centerX;
+        mapCenterZ = centerZ;
         String[] names = {"Northland", "Ironvale", "Ambercoast", "Greenreach", "Bluehaven", "Sunspire"};
-        int[][] candidates = {{-20,-12},{0,-20},{20,-12},{-20,12},{0,20},{20,12},{-30,0},{30,0}};
+        int[][] candidates = {{-5,-3},{0,-5},{5,-3},{-5,3},{0,5},{5,3}};
         List<int[]> centers = new ArrayList<>(Arrays.asList(candidates));
         Collections.shuffle(centers, random);
         List<String> countryNames = new ArrayList<>(Arrays.asList(names));
         Collections.shuffle(countryNames, random);
+        for (int dx = -MAP_RADIUS; dx <= MAP_RADIUS; dx++) for (int dz = -MAP_RADIUS; dz <= MAP_RADIUS; dz++) {
+            String tile = key(centerX + dx, centerZ + dz);
+            mapChunks.add(tile);
+            waterChunks.add(tile);
+        }
         for (int i = 0; i < names.length; i++) {
             String name = countryNames.get(i), id = name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "");
             int[] offset = centers.get(i);
@@ -334,15 +362,45 @@ public class Game {
             nation.borderColor = nation.color; nation.capital = key(cx, cz); nation.computerControlled = true;
             nation.gold = START_GOLD; nation.oil = START_OIL;
             nations.put(id, nation); scenarioCountries.add(id);
-            for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) {
-                String chunk = key(cx + dx, cz + dz); owner.put(chunk, id);
+            for (String chunk : randomIsland(cx, cz, 7 + random.nextInt(3), random)) {
+                owner.put(chunk, id);
+                waterChunks.remove(chunk);
                 terrain.put(chunk, random.nextInt(TYPE_NAMES.length));
                 resourceQuality.put(chunk, 1 + random.nextInt(3));
-                if (dx == 0 && dz == 0) unitsAt(chunk).put(UnitType.INFANTRY.id(), (int) START_TROOPS);
             }
+            unitsAt(nation.capital).put(UnitType.INFANTRY.id(), (int) START_TROOPS);
         }
+        mapGenerated = true;
         events.toAll("A randomized six-country map is ready. Choose with /start as <name> or /start random.");
         return ok("Generated a randomized map with six countries: " + String.join(", ", countryNames) + ". Choose with /start as <name> or /start random.");
+    }
+
+    private Set<String> randomIsland(int centerX, int centerZ, int size, Random random) {
+        LinkedHashSet<String> island = new LinkedHashSet<>();
+        List<String> frontier = new ArrayList<>();
+        String center = key(centerX, centerZ);
+        island.add(center);
+        frontier.add(center);
+        int[][] directions = {{1,0},{-1,0},{0,1},{0,-1}};
+        while (island.size() < size && !frontier.isEmpty()) {
+            String from = frontier.get(random.nextInt(frontier.size()));
+            int x = cx(from), z = cz(from);
+            List<String> candidates = new ArrayList<>();
+            for (int[] d : directions) {
+                int nx = x + d[0], nz = z + d[1];
+                String next = key(nx, nz);
+                if (Math.abs(nx - centerX) <= 2 && Math.abs(nz - centerZ) <= 2
+                        && mapChunks.contains(next) && !island.contains(next) && !owner.containsKey(next))
+                    candidates.add(next);
+            }
+            if (candidates.isEmpty()) frontier.remove(from);
+            else {
+                String next = candidates.get(random.nextInt(candidates.size()));
+                island.add(next);
+                frontier.add(next);
+            }
+        }
+        return island;
     }
 
     public List<String> availableCountries() {

@@ -36,6 +36,8 @@ final class Store {
                     if (g.resourceQuality == null) g.resourceQuality = new java.util.HashMap<>();
                     if (g.markerIds == null) g.markerIds = new java.util.HashMap<>();
                     if (g.scenarioCountries == null) g.scenarioCountries = new java.util.ArrayList<>();
+                    if (g.mapChunks == null) g.mapChunks = new java.util.HashSet<>();
+                    if (g.waterChunks == null) g.waterChunks = new java.util.HashSet<>();
                     for (Game.Nation n : g.nations.values()) {
                         if (n.borderColor == null) n.borderColor = n.color;
                         if (n.upgrades == null) n.upgrades = new java.util.LinkedHashMap<>();

@@ -26,6 +26,18 @@ import java.util.function.Function;
 /** /nation ... command tree. All rules live in {@link Game}; this only translates input and output. */
 final class NationCommands {
     private static final int NATION = 1, LEADER = 2, OVERWORLD = 4;
+    private static final Map<UUID, Integer> TUTORIAL_PROGRESS = new HashMap<>();
+    private static final String[] TUTORIAL = {
+            "Terracotta in your nation's colour marks its land. Your capital starts with 20 infantry, 100 gold and 10 oil. Right-click your Field Guide to open the menu.",
+            "Farms make infantry, oilfields make oil, and plains make mixed income. Statistics shows what your land earns each round.",
+            "Open Army Store, pick Ground, Air or Water, then click a unit. Left-click buys one; right-click buys five.",
+            "Open Deploy while on your land. Pick a nearby chunk, unit and amount, then click the sword. Ground forces stay on land; aircraft and ships cross sea.",
+            "Empty land can be captured by attacking it. Declare war before attacking another nation. Sea cannot be captured.",
+            "Upgrades improve income or attack and defense for ground, air and water forces. Statistics shows each defense separately.",
+            "After your moves, right-click the End Turn Bell. Income and battles resolve as the randomized turn order advances.",
+            "Tutorial complete! Use /nation tutorial restart whenever you want to see it again."
+    };
+
 
     private interface Body {
         /** Return a result to print, or null if the body already printed its own output. */
@@ -39,14 +51,14 @@ final class NationCommands {
 
     static void register(CommandDispatcher<CommandSourceStack> d) {
         LiteralArgumentBuilder<CommandSourceStack> start = Commands.literal("start")
-                .executes(c -> run(c, OVERWORLD, (p, n, ctx) -> DummyCraft.game.generateMap(cx(p), cz(p))));
+                .executes(c -> run(c, OVERWORLD, (p, n, ctx) -> DummyCraft.generateMap(p)));
         start.then(Commands.literal("as")
                 .then(Commands.argument("country", StringArgumentType.word()).suggests(COUNTRIES)
                         .executes(c -> run(c, OVERWORLD, (p, n, ctx) ->
                                 chooseCountry(p, StringArgumentType.getString(ctx, "country"))))));
         start.then(Commands.literal("random").executes(c -> run(c, OVERWORLD, (p, n, ctx) -> {
             if (!DummyCraft.game.mapGenerated) {
-                Game.R generated = DummyCraft.game.generateMap(cx(p), cz(p));
+                Game.R generated = DummyCraft.generateMap(p);
                 if (!generated.ok()) return generated;
             }
             return chooseCountry(p, "random");
@@ -71,7 +83,11 @@ final class NationCommands {
                 .executes(c -> run(c, NATION | LEADER, (p, n, ctx) ->
                         DummyCraft.game.setBorderColor(n, StringArgumentType.getString(ctx, "color"))))));
         nation.then(Commands.literal("endturn").executes(c -> run(c, 0, (p, n, ctx) -> DummyCraft.game.endTurn(p.getUUID()))));
-        nation.then(Commands.literal("tutorial").executes(c -> run(c, 0, (p, n, ctx) -> { tutorial(p); return null; })));
+        LiteralArgumentBuilder<CommandSourceStack> tutorial = Commands.literal("tutorial")
+                .executes(c -> run(c, 0, (p, n, ctx) -> { startTutorial(p); return null; }));
+        tutorial.then(Commands.literal("next").executes(c -> run(c, 0, (p, n, ctx) -> { nextTutorial(p); return null; })));
+        tutorial.then(Commands.literal("restart").executes(c -> run(c, 0, (p, n, ctx) -> { startTutorial(p); return null; })));
+        nation.then(tutorial);
         nation.then(Commands.literal("recruit").then(Commands.argument("amount", IntegerArgumentType.integer(1, 1000))
                 .executes(c -> run(c, NATION, (p, n, ctx) ->
                         DummyCraft.game.recruit(n, IntegerArgumentType.getInteger(ctx, "amount"))))));
@@ -164,6 +180,7 @@ final class NationCommands {
         p.teleportTo(bx + 0.5, y + 0.1, bz + 0.5);
         p.playSound(SoundEvents.UI_TOAST_IN, 0.8f, 1.0f);
         NationItems.giveStarterKit(p);
+        tutorial(p);
         NationMenu.openTutorial(p, DummyCraft.game);
         return result;
     }
@@ -204,7 +221,26 @@ final class NationCommands {
         for (String l : lines) p.sendSystemMessage(Component.literal(l).withStyle(ChatFormatting.YELLOW));
     }
 
-    private static void tutorial(ServerPlayer p) {
+    private static void tutorial(ServerPlayer p) { startTutorial(p); }
+
+    static int tutorialNumber(UUID player) { return TUTORIAL_PROGRESS.getOrDefault(player, 0); }
+
+    static void startTutorial(ServerPlayer player) {
+        TUTORIAL_PROGRESS.put(player.getUUID(), 0);
+        nextTutorial(player);
+    }
+
+    static void nextTutorial(ServerPlayer player) {
+        int step = TUTORIAL_PROGRESS.getOrDefault(player.getUUID(), 0);
+        if (step >= TUTORIAL.length) step = TUTORIAL.length - 1;
+        else TUTORIAL_PROGRESS.put(player.getUUID(), step + 1);
+        player.sendSystemMessage(Component.literal("Dymmynation tutorial • Lesson " + (step + 1) + " of " + TUTORIAL.length)
+                .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
+        player.sendSystemMessage(Component.literal(TUTORIAL[step]).withStyle(ChatFormatting.WHITE));
+        if (step + 1 < TUTORIAL.length)
+            player.sendSystemMessage(Component.literal("Click Next lesson in the guide or type /nation tutorial next.").withStyle(ChatFormatting.AQUA));
+        else player.sendSystemMessage(Component.literal("Tutorial complete. Type /nation tutorial restart to begin again.").withStyle(ChatFormatting.GREEN));
+    }
         String[] lines = {
             "Dymmynation tutorial — quick start:",
             "1) Host: /start creates the map. Each player then uses /start as <country> or /start random.",

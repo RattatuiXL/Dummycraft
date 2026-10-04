@@ -137,7 +137,9 @@ final class NationMenu extends ChestMenu {
                 } else if (slot == 49) reopen(Page.HOME, sourceX, sourceZ, targetX, targetZ, amount, selected);
             }
             case TUTORIAL -> {
-                if (slot == 49) reopen(Page.HOME, sourceX, sourceZ, targetX, targetZ, amount, selected);
+                if (slot == 22) NationCommands.nextTutorial(player);
+                else if (slot == 20) NationCommands.startTutorial(player);
+                else if (slot == 49) reopen(Page.HOME, sourceX, sourceZ, targetX, targetZ, amount, selected);
             }
         }
         player.playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.6f, 1.2f);
@@ -167,6 +169,10 @@ final class NationMenu extends ChestMenu {
             put(28, Items.SHIELD, "5. Your owned neighbor is a move; other land is an attack");
             put(30, Items.WHEAT, "6. Farms make infantry; oilfields make oil; plains make mixed income");
             put(32, Items.BELL, "7. Upgrade stats, then end your turn with the bell");
+            put(4, Items.BOOK, "DYMMYNATION  |  Guided first round");
+            put(10, Items.PAPER, "Current chat lesson: " + NationCommands.tutorialNumber(player.getUUID()) + " / 8");
+            put(20, Items.RECOVERY_COMPASS, "Restart tutorial lessons");
+            put(22, Items.ARROW, "Next lesson (read the chat explanation)");
             put(49, Items.ARROW, "Back"); return;
         }
         if (n == null) return;
@@ -210,14 +216,14 @@ final class NationMenu extends ChestMenu {
                 for (int i = 0; i < dirs.length; i++) {
                     int x = sourceX + dirs[i][0], z = sourceZ + dirs[i][1];
                     Game.Nation owner = game.at(x, z);
-                    put(slots[i], owner == null ? Items.GRASS_BLOCK : Items.RED_BANNER,
-                            labels[i] + "  " + x + "," + z + "  " + (owner == null ? "Wilderness" : owner.name) + "  " + game.terrainName(Game.key(x,z)));
+                    put(slots[i], game.isWater(x, z) ? Items.WATER_BUCKET : owner == null ? Items.GRASS_BLOCK : Items.RED_BANNER,
+                            labels[i] + "  " + x + "," + z + "  " + (game.isWater(x, z) ? "Sea: air and ships can cross" : owner == null ? "Wilderness" : owner.name) + "  " + game.terrainName(Game.key(x,z)));
                 }
                 put(10, Items.CHEST, "Source: " + sourceX + "," + sourceZ + " | your units");
                 put(49, Items.ARROW, "Back");
             }
             case DEPLOY -> {
-                put(4, Items.TARGET, "Target: " + targetX + "," + targetZ + "  " + game.terrainName(Game.key(targetX,targetZ)));
+                put(4, game.isWater(targetX, targetZ) ? Items.WATER_BUCKET : Items.TARGET, "Target: " + targetX + "," + targetZ + (game.isWater(targetX, targetZ) ? "  SEA: cannot capture" : "  " + game.terrainName(Game.key(targetX,targetZ))));
                 for (UnitType type : UnitType.values()) {
                     int slot = unitSlot(type);
                     int count = game.unitsAt(Game.key(sourceX, sourceZ)).getOrDefault(type.id(), 0);
@@ -254,8 +260,8 @@ final class NationMenu extends ChestMenu {
         for (int dz = -3; dz <= 2; dz++) for (int dx = -4; dx <= 3; dx++) {
             int x = sourceX + dx, z = sourceZ + dz, slot = (dz + 3) * 9 + (dx + 4);
             Game.Nation owner = game.at(x, z);
-            Item icon = owner == mine ? Items.LIME_STAINED_GLASS : owner == null ? Items.GRAY_STAINED_GLASS : Items.RED_STAINED_GLASS;
-            put(slot, icon, x + "," + z + " | " + (owner == null ? "wilderness" : owner.name) + " | " + game.terrainName(Game.key(x,z)));
+            Item icon = owner == mine ? Items.LIME_STAINED_GLASS : game.isWater(x, z) ? Items.BLUE_STAINED_GLASS : owner == null ? Items.GRAY_STAINED_GLASS : Items.RED_STAINED_GLASS;
+            put(slot, icon, x + "," + z + " | " + (game.isWater(x, z) ? "Sea: air and ships can cross" : owner == null ? "Wilderness" : owner.name) + (game.isWater(x, z) ? "" : " | " + game.terrainName(Game.key(x,z))));
         }
         put(49, Items.ARROW, "Back");
     }
