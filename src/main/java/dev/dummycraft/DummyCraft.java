@@ -69,8 +69,8 @@ public class DummyCraft implements ModInitializer {
         int x = pos.getX() >> 4, z = pos.getZ() >> 4;
         if (game.canBuild(sp.getUUID(), x, z)) return true;
         Game.Nation o = game.at(x, z);
-        sp.displayClientMessage(Component.literal("This land belongs to " + (o == null ? "?" : o.name) + ".")
-                .withStyle(ChatFormatting.RED), true);
+        sp.sendOverlayMessage(Component.literal("This land belongs to " + (o == null ? "?" : o.name) + ".")
+                .withStyle(ChatFormatting.RED));
         return false;
     }
 
@@ -101,6 +101,6 @@ public class DummyCraft implements ModInitializer {
             c.append(Component.literal("  \u2694 " + (att == null ? "?" : att.name) + " " + (int) Math.max(0, op.progress) + "%")
                     .withStyle(ChatFormatting.RED));
         }
-        p.displayClientMessage(c, true);
+        p.sendOverlayMessage(c);
     }
 }
