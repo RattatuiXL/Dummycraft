@@ -241,19 +241,6 @@ final class NationCommands {
             player.sendSystemMessage(Component.literal("Click Next lesson in the guide or type /nation tutorial next.").withStyle(ChatFormatting.AQUA));
         else player.sendSystemMessage(Component.literal("Tutorial complete. Type /nation tutorial restart to begin again.").withStyle(ChatFormatting.GREEN));
     }
-        String[] lines = {
-            "Dymmynation tutorial — quick start:",
-            "1) Host: /start creates the map. Each player then uses /start as <country> or /start random.",
-            "2) You start with 20 infantry, 100 gold, 10 oil, a Field Guide and an End Turn Bell.",
-            "3) Right-click the guide or type /nation menu. Open Ground, Air or Water, then the store. Left-click buys 1; right-click buys 5.",
-            "4) Stand in a chunk you own. Open Deploy, pick a neighboring chunk, choose a unit type and set the amount.",
-            "5) Sending troops to your own neighbor moves them. Sending troops to wilderness attacks it. Declare war before attacking another nation.",
-            "6) Farms make infantry, oilfields make oil, and plains make a little gold, oil and infantry. Poor/rich land changes yields.",
-            "7) Upgrades improve income or ground, air and water attack/defense. Right-click the Bell to end your turn.",
-            "Income and battles resolve after every nation has taken a turn. The next player is shown in your menu."
-        };
-        for (String line : lines) p.sendSystemMessage(Component.literal(line).withStyle(ChatFormatting.GOLD));
-    }
 
     private static void info(ServerPlayer p, Game.Nation n) {
         Game g = DummyCraft.game;
